@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en" class="dark h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <title>WAXTIX - Social Platform</title>
+    <meta name="description" content="WAXTIX is a mobile-first social platform for short videos, news, chat and creators.">
+    <meta name="theme-color" content="#050507">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            bg: '#0d0e12',
+                            card: '#16181f',
+                            surface: '#20232e',
+                            border: '#2c303e'
+                        },
+                        neon: {
+                            cyan: '#00f0ff',
+                            pink: '#ff007f',
+                            yellow: '#ffb700',
+                            purple: '#7000ff',
+                            green: '#00ff66'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        };
+    </script>
+
+    <!-- FontAwesome Icons & Google Fonts -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #050507;
+            color: #f3f4f6;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        /* Hide scrollbars */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+        * {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Glassmorphism Styling */
+        .glass-panel {
+            background: rgba(18, 20, 27, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-pill {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        /* Glowing Rainbow Hexagon Logo SVG */
+        .hex-svg {
+            filter: drop-shadow(0 0 6px rgba(0, 240, 255, 0.7)) drop-shadow(0 0 10px rgba(255, 0, 127, 0.6));
+        }
+
+        /* Rainbow Action Ring (+ Button) */
+        .rainbow-ring {
+            background: linear-gradient(135deg, #00f0ff, #7000ff, #ff007f, #ffb700, #00ff66);
+            background-size: 300% 300%;
+            animation: rainbowShift 4s ease infinite;
+        }
+
+        @keyframes rainbowShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Rotating Vinyl Disc */
+        @keyframes spinSlow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin-slow {
+            animation: spinSlow 5s linear infinite;
+        }
+
+        /* Video Snap Scrolling */
+        .reels-scroll-container {
+            scroll-snap-type: y mandatory;
+            overflow-y: scroll;
+            height: 100%;
+        }
+        .reel-card {
+            scroll-snap-align: start;
+            scroll-snap-stop: always;
+        }
+    </style>
+
+    <!-- Firebase Realtime Database. Local demo fallback is used if unavailable. -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getDatabase, ref, push, onChildAdded, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+
+        const firebaseConfig = {
+            databaseURL: "https://waxtix-3cc19-default-rtdb.firebaseio.com/"
+        };
+
+        try {
+            const app = initializeApp(firebaseConfig);
+            const db = getDatabase(app);
+            const messagesRef = ref(db, "chats/global/messages");
+            window.waxtixSendMessage = (message) => push(messagesRef, {
+                sender: "@you", text: message, timestamp: Date.now(), createdAt: serverTimestamp()
+            });
+            onChildAdded(messagesRef, (snapshot) => {
+                const message = snapshot.val();
+                if (message && typeof message.text === "string" &&
+                    typeof window.renderWAXTIXMessage === "function") {
+                    window.renderWAXTIXMessage(message, snapshot.key);
+                }
+            }, (error) => console.warn("WAXTIX chat listener:", error));
+            window.waxtixFirebaseReady = true;
+            console.info("WAXTIX: Firebase Realtime Database connected.");
+        } catch (error) {
+            window.waxtixFirebaseReady = false;
+            console.warn("WAXTIX: Running in local demo mode.", error);
+        }
+    </script>
+</head>
+<body class="bg-black text-gray-100 h-full w-full flex justify-center items-center">
+
+    <!-- Mobile App Container -->
+    <div class="w-full max-w-md h-full sm:h-[94vh] bg-dark-bg sm:rounded-3xl border-0 sm:border border-dark-border shadow-2xl flex flex-col relative overflow-hidden">
+
+        <!-- 1. TOP HEADER BAR -->
+        <header class="glass-panel z-40 px-4 py-3 flex items-center justify-between sticky top-0 shrink-0">
+            <!-- Left: Rainbow Hexagon Logo & Title -->
+            <div class="flex items-center space-x-2.5 cursor-pointer" onclick="switchTab('reels')">
+                <div class="relative w-8 h-8 flex items-center justify-center">
+                    <svg class="hex-svg w-8 h-8" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <polygon points="50,5 90,27.5 90,72.5 50,95 10,72.5 10,27.5" stroke="url(#rainbow-grad)" stroke-width="7" fill="none" />
+                        <line x1="50" y1="5" x2="50" y2="30" stroke="#00f0ff" stroke-width="4"/>
+                        <line x1="90" y1="27.5" x2="70" y2="40" stroke="#7000ff" stroke-width="4"/>
+                        <line x1="90" y1="72.5" x2="70" y2="60" stroke="#ff007f" stroke-width="4"/>
+                        <line x1="50" y1="95" x2="50" y2="70" stroke="#ffb700" stroke-width="4"/>
+                        <line x1="10" y1="72.5" x2="30" y2="60" stroke="#00ff66" stroke-width="4"/>
+                        <line x1="10" y1="27.5" x2="30" y2="40" stroke="#00f0ff" stroke-width="4"/>
+                        <polygon points="50,30 70,40 70,60 50,70 30,60 30,40" stroke="url(#rainbow-grad-2)" stroke-width="5" fill="rgba(0,0,0,0.7)" />
+                        <defs>
+                            <linearGradient id="rainbow-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#00f0ff" />
+                                <stop offset="25%" stop-color="#00ff66" />
+                                <stop offset="50%" stop-color="#ffb700" />
+                                <stop offset="75%" stop-color="#ff007f" />
+                                <stop offset="100%" stop-color="#7000ff" />
+                            </linearGradient>
+                            <linearGradient id="rainbow-grad-2" x1="100%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stop-color="#ff007f" />
+                                <stop offset="50%" stop-color="#00f0ff" />
+                                <stop offset="100%" stop-color="#ffb700" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <span class="text-xl font-black tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-amber-400 to-pink-500">
+                    WAXTIX
+                </span>
+            </div>
+
+            <!-- Header Tabs: Following vs For You -->
+            <div class="flex items-center space-x-4 text-xs font-semibold">
+                <button onclick="selectFeed(this, 'following')" class="feed-btn text-gray-400 hover:text-white transition">Following</button>
+                <button onclick="selectFeed(this, 'foryou')" class="feed-btn text-white border-b-2 border-neon-pink pb-0.5 font-bold">For You</button>
+            </div>
+        </header>
+
+        <!-- 2. MAIN VIEWPORT (5 TABS) -->
+        <main class="flex-1 relative overflow-hidden bg-black">
+
+            <!-- TAB 1: REELS FEED -->
+            <section id="tab-reels" class="tab-page h-full w-full">
+                <div class="reels-scroll-container">
+                    <div class="reel-card relative h-full w-full bg-dark-bg flex items-center justify-center overflow-hidden">
+                        
+                        <!-- Background Reel Poster -->
+                        <img src="https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=800&q=80" class="absolute inset-0 w-full h-full object-cover opacity-85" alt="Reel Video">
+                        <div class="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/90"></div>
+
+                        <!-- Top-Left Watermark Tag -->
+                        <div class="absolute top-4 left-4 z-20 flex items-center space-x-1.5 px-3 py-1 rounded-full glass-pill border border-white/20">
+                            <div class="w-3.5 h-3.5 rounded-full bg-gradient-to-tr from-cyan-400 via-amber-400 to-pink-500 flex items-center justify-center text-[7px] font-black text-black">W</div>
+                            <span class="text-[10px] font-bold tracking-widest text-white">WAXTIX</span>
+                        </div>
+
+                        <!-- Right Sidebar Interactions -->
+                        <div class="absolute right-3 bottom-16 flex flex-col items-center space-y-4 z-30">
+                            <!-- Avatar & Follow Button -->
+                            <div class="relative mb-2">
+                                <div class="w-12 h-12 rounded-full p-0.5 rainbow-ring">
+                                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80" class="w-full h-full rounded-full object-cover" alt="Creator">
+                                </div>
+                                <button onclick="showToast('Followed @novamoves!')" class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-5 bg-neon-pink text-white rounded-full flex items-center justify-center text-xs shadow-lg hover:scale-110 transition">
+                                    <i class="fa-solid fa-plus text-[10px]"></i>
+                                </button>
+                            </div>
+
+                            <!-- Heart Like Button -->
+                            <button onclick="handleLike(this)" class="flex flex-col items-center text-white group">
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center bg-black/40 backdrop-blur-md border border-white/10 group-hover:scale-110 transition">
+                                    <i class="fa-solid fa-heart text-xl text-white like-icon"></i>
+                                </div>
+                                <span class="text-[10px] font-bold mt-1 text-gray-200 like-count drop-shadow">482.1K</span>
+                            </button>
+
+                            <!-- Comment Button -->
+                            <button onclick="switchTab('chat')" class="flex flex-col items-center text-white group">
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center bg-black/40 backdrop-blur-md border border-white/10 group-hover:scale-110 transition">
+                                    <i class="fa-solid fa-comment-dots text-xl text-white"></i>
+                                </div>
+                                <span class="text-[10px] font-bold mt-1 text-gray-200 drop-shadow">3.2K</span>
+                            </button>
+
+                            <!-- Share Button -->
+                            <button onclick="shareVideo('@novamoves')" class="flex flex-col items-center text-white group">
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center bg-black/40 backdrop-blur-md border border-white/10 group-hover:scale-110 transition">
+                                    <i class="fa-solid fa-share text-xl text-white"></i>
+                                </div>
+                                <span class="text-[10px] font-bold mt-1 text-gray-200 drop-shadow">12.4K</span>
+                            </button>
+
+                            <!-- Save / Download -->
+                            <button onclick="showToast('Saving video with WAXTIX watermark...')" class="flex flex-col items-center text-white group">
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center bg-black/40 backdrop-blur-md border border-white/10 group-hover:scale-110 transition">
+                                    <i class="fa-solid fa-download text-lg text-white"></i>
+                                </div>
+                                <span class="text-[10px] font-bold mt-1 text-gray-200 drop-shadow">Save</span>
+                            </button>
+
+                            <!-- Rotating Disc -->
+                            <div class="w-10 h-10 rounded-full bg-black/80 p-1 border-2 border-neon-cyan shadow-xl animate-spin-slow flex items-center justify-center mt-2">
+                                <div class="w-full h-full rounded-full bg-dark-card border border-dark-border flex items-center justify-center">
+                                    <i class="fa-solid fa-music text-[10px] text-neon-pink"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Caption overlay -->
+                        <div class="absolute bottom-5 left-4 right-16 z-20 space-y-2">
+                            <div class="flex items-center space-x-1.5">
+                                <span class="font-bold text-sm text-white drop-shadow">@novamoves</span>
+                                <i class="fa-solid fa-circle-check text-xs text-cyan-400"></i>
+                            </div>
+
+                            <p class="text-xs text-gray-100 leading-snug drop-shadow line-clamp-2">
+                                Rain didn't stop the rooftop session 🌧️ new choreo drops Friday <br>
+                                <span class="font-semibold text-cyan-300">#dance #rooftop #nightcity</span>
+                            </p>
+
+                            <div class="flex items-center space-x-2 text-[11px] text-gray-300">
+                                <i class="fa-solid fa-music text-xs animate-pulse text-neon-pink"></i>
+                                <span class="truncate font-medium">Original sound - novamoves</span>
+                            </div>
+
+                            <!-- Video Seek Bar -->
+                            <div class="pt-2 flex items-center space-x-2">
+                                <span class="text-[9px] text-gray-300 font-mono">0:03</span>
+                                <div class="flex-1 h-1 bg-gray-700/80 rounded-full overflow-hidden">
+                                    <div class="w-1/3 h-full bg-gradient-to-r from-cyan-400 via-pink-500 to-yellow-400"></div>
+                                </div>
+                                <span class="text-[9px] text-gray-300 font-mono">0:42</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: NEWS FEED -->
+            <section id="tab-news" class="tab-page hidden h-full p-4 overflow-y-auto space-y-4 pb-20 bg-dark-bg">
+                <div class="flex items-center justify-between mb-2">
+                    <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+                        <i class="fa-solid fa-newspaper text-neon-pink"></i>
+                        <span>WAXTIX News</span>
+                    </h2>
+                    <span class="text-[10px] bg-dark-surface border border-dark-border px-2.5 py-1 rounded-full text-cyan-400 font-semibold">Live Feed</span>
+                </div>
+
+                <article class="bg-dark-card border border-dark-border rounded-2xl p-4 space-y-3">
+                    <div class="flex items-center justify-between text-xs text-gray-400">
+                        <span class="bg-cyan-500/10 text-cyan-400 px-2 py-0.5 rounded-md font-semibold text-[10px]">TECH & SOCIAL</span>
+                        <span>12m ago</span>
+                    </div>
+                    <h3 class="font-bold text-sm text-gray-100 leading-snug">
+                        WAXTIX Integrates Realtime Audio & Video Feeds Globally
+                    </h3>
+                    <p class="text-xs text-gray-400 leading-relaxed">
+                        Creators can now leverage instant database listeners paired with low-latency streaming pipelines for maximum engagement...
+                    </p>
+                    <div class="flex items-center justify-between border-t border-dark-border/60 pt-3 text-xs text-gray-400">
+                        <button onclick="handleLike(this)" class="flex items-center space-x-1.5 hover:text-neon-pink">
+                            <i class="fa-regular fa-heart"></i>
+                            <span class="like-count">1.4K</span>
+                        </button>
+                        <button onclick="switchTab('chat')" class="flex items-center space-x-1.5 hover:text-cyan-400">
+                            <i class="fa-regular fa-comment"></i>
+                            <span>198</span>
+                        </button>
+                        <button onclick="shareVideo('WAXTIX News')" class="hover:text-white">
+                            <i class="fa-solid fa-arrow-up-from-bracket"></i>
+                        </button>
+                    </div>
+                </article>
+            </section>
+
+            <!-- TAB 3: MEDIA UPLOAD -->
+            <section id="tab-upload" class="tab-page hidden h-full p-4 overflow-y-auto space-y-4 pb-20 bg-dark-bg">
+                <h2 class="text-lg font-bold text-white">Upload New Media</h2>
+
+                <div class="bg-gradient-to-r from-cyan-900/30 via-purple-900/30 to-pink-900/30 border border-dark-border rounded-2xl p-4 flex items-center justify-between">
+                    <div>
+                        <p class="text-[10px] font-bold text-cyan-400 uppercase tracking-widest">Upload Preview</p>
+                        <p class="text-xs font-semibold text-gray-200 mt-0.5">Local preview (Storage not configured)</p>
+                    </div>
+                    <i class="fa-solid fa-cloud-arrow-up text-2xl text-neon-pink"></i>
+                </div>
+
+                <div onclick="document.getElementById('file-input').click()" class="border-2 border-dashed border-dark-border hover:border-cyan-400 rounded-2xl p-8 text-center cursor-pointer transition bg-dark-card/50">
+                    <i class="fa-solid fa-film text-4xl text-gray-500 mb-3"></i>
+                    <p class="text-xs font-semibold text-gray-200">Select Video or Image</p>
+                    <p class="text-[10px] text-gray-500 mt-1">MP4, MOV or PNG, JPG</p>
+                    <input type="file" id="file-input" class="hidden" accept="video/*,image/*" onchange="onFileSelected(event)">
+                </div>
+
+                <div id="upload-progress-card" class="hidden bg-dark-card p-3 rounded-xl border border-dark-border space-y-2">
+                    <div class="flex justify-between text-xs text-gray-300">
+                        <span id="file-label">video_file.mp4</span>
+                        <span id="percent-label">0%</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-dark-surface rounded-full overflow-hidden">
+                        <div id="progress-bar" class="h-full bg-gradient-to-r from-cyan-400 to-pink-500 w-0 transition-all duration-300"></div>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-1">Caption & Hashtags</label>
+                        <textarea id="caption-input" rows="3" placeholder="Write caption... #WAXTIX" class="w-full bg-dark-card border border-dark-border rounded-xl p-3 text-xs text-white focus:outline-none focus:border-cyan-400 resize-none"></textarea>
+                    </div>
+
+                    <button onclick="startUploadProcess()" class="w-full py-3.5 bg-gradient-to-r from-cyan-500 via-pink-500 to-amber-500 text-white font-bold rounded-xl text-xs transition shadow-lg flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-paper-plane"></i>
+                        <span>Publish Content</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- TAB 4: REALTIME CHAT -->
+            <section id="tab-chat" class="tab-page hidden h-full flex flex-col bg-dark-bg">
+                <div class="p-3 bg-dark-card border-b border-dark-border flex items-center justify-between shrink-0">
+                    <div class="flex items-center space-x-3">
+                        <div class="relative">
+                            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80" class="w-9 h-9 rounded-full object-cover" alt="User">
+                            <span class="w-2.5 h-2.5 bg-emerald-500 rounded-full absolute bottom-0 right-0 border-2 border-dark-card"></span>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-xs text-white">Global WAXTIX Chat</h3>
+                            <p class="text-[9px] text-cyan-400 font-mono">RTDB Live Endpoint</p>
+                        </div>
+                    </div>
+
+                    <!-- Auto-Translate Toggle -->
+                    <div class="flex items-center space-x-1.5 bg-dark-surface px-2.5 py-1 rounded-full border border-dark-border">
+                        <i class="fa-solid fa-language text-amber-400 text-xs"></i>
+                        <span class="text-[10px] text-gray-300 font-medium">Translate</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="translate-switch" class="sr-only peer" onchange="toggleTranslation()">
+                            <div class="w-7 h-4 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-neon-pink"></div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Chat Stream -->
+                <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3">
+                    <div class="flex items-start space-x-2 max-w-[85%]">
+                        <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" class="w-7 h-7 rounded-full object-cover mt-1" alt="Avatar">
+                        <div class="bg-dark-card p-3 rounded-2xl rounded-tl-none border border-dark-border">
+                            <div class="flex justify-between items-center text-[9px] text-gray-400 mb-1 space-x-3">
+                                <span class="font-bold text-cyan-400">@novamoves</span>
+                                <span>17:15</span>
+                            </div>
+                            <p class="text-xs text-gray-200 chat-text-body" data-orig="Muraho! Murakaza neza kuri WAXTIX application." data-trans="Hello! Welcome to WAXTIX social platform.">
+                                Muraho! Murakaza neza kuri WAXTIX application.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Field -->
+                <div class="p-3 bg-dark-card border-t border-dark-border flex items-center space-x-2 shrink-0">
+                    <button onclick="showToast('Attachment upload opened')" class="text-gray-400 hover:text-amber-400 p-2">
+                        <i class="fa-solid fa-paperclip text-sm"></i>
+                    </button>
+                    <input type="text" id="chat-input" placeholder="Type message..." class="flex-1 bg-dark-surface border border-dark-border rounded-full px-4 py-2 text-xs text-white focus:outline-none focus:border-neon-pink">
+                    <button onclick="sendChatMessage()" class="w-8 h-8 bg-neon-pink hover:bg-pink-600 text-white rounded-full flex items-center justify-center transition shadow-lg">
+                        <i class="fa-solid fa-paper-plane text-xs"></i>
+                    </button>
+                </div>
+            </section>
+
+            <!-- TAB 5: PROFILE -->
+            <section id="tab-profile" class="tab-page hidden h-full p-4 overflow-y-auto space-y-4 pb-20 bg-dark-bg">
+                <div class="flex flex-col items-center text-center space-y-2">
+                    <div class="relative">
+                        <div class="w-20 h-20 rounded-full p-1 rainbow-ring">
+                            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80" class="w-full h-full rounded-full object-cover" alt="Profile Avatar">
+                        </div>
+                    </div>
+                    <div>
+                        <h2 class="text-base font-bold text-white flex items-center justify-center space-x-1">
+                            <span>Nova Moves</span>
+                            <i class="fa-solid fa-circle-check text-xs text-cyan-400"></i>
+                        </h2>
+                        <p class="text-xs text-cyan-400 font-mono">@novamoves • WAXTIX Creator</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2 bg-dark-card border border-dark-border rounded-2xl p-3 text-center">
+                    <div>
+                        <p class="text-sm font-bold text-white">48</p>
+                        <p class="text-[9px] text-gray-400 uppercase">Posts</p>
+                    </div>
+                    <div class="border-x border-dark-border">
+                        <p class="text-sm font-bold text-white">12.8K</p>
+                        <p class="text-[9px] text-gray-400 uppercase">Followers</p>
+                    </div>
+                    <div>
+                        <p class="text-sm font-bold text-white">954</p>
+                        <p class="text-[9px] text-gray-400 uppercase">Following</p>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- 3. BOTTOM NAVIGATION -->
+        <nav class="glass-panel sticky bottom-0 z-40 border-t border-dark-border px-2 py-2 flex justify-around items-center shrink-0">
+            <button onclick="switchTab('reels')" id="nav-reels" class="nav-item text-neon-pink flex flex-col items-center transition">
+                <i class="fa-solid fa-house text-lg"></i>
+                <span class="text-[9px] font-semibold mt-0.5">Home</span>
+            </button>
+
+            <button onclick="switchTab('news')" id="nav-news" class="nav-item text-gray-400 hover:text-white flex flex-col items-center transition">
+                <i class="fa-solid fa-newspaper text-lg"></i>
+                <span class="text-[9px] font-semibold mt-0.5">News</span>
+            </button>
+
+            <button onclick="switchTab('upload')" id="nav-upload" class="nav-item flex flex-col items-center -mt-3 group">
+                <div class="w-11 h-11 rounded-full rainbow-ring p-0.5 flex items-center justify-center shadow-xl group-hover:scale-105 transition">
+                    <div class="w-full h-full bg-black rounded-full flex items-center justify-center text-white">
+                        <i class="fa-solid fa-plus text-base font-bold"></i>
+                    </div>
+                </div>
+            </button>
+
+            <button onclick="switchTab('chat')" id="nav-chat" class="nav-item text-gray-400 hover:text-white flex flex-col items-center transition relative">
+                <i class="fa-solid fa-comments text-lg"></i>
+                <span class="text-[9px] font-semibold mt-0.5">Chat</span>
+                <span class="w-2 h-2 rounded-full bg-neon-pink absolute top-0 right-2"></span>
+            </button>
+
+            <button onclick="switchTab('profile')" id="nav-profile" class="nav-item text-gray-400 hover:text-white flex flex-col items-center transition">
+                <i class="fa-solid fa-user text-lg"></i>
+                <span class="text-[9px] font-semibold mt-0.5">Profile</span>
+            </button>
+        </nav>
+
+        <!-- TOAST POPUP -->
+        <div id="toast-popup" class="hidden absolute top-16 left-1/2 -translate-x-1/2 z-50 glass-pill border border-neon-cyan/40 text-white text-xs px-4 py-2 rounded-full shadow-2xl flex items-center space-x-2">
+            <i class="fa-solid fa-circle-check text-cyan-400"></i>
+            <span id="toast-text">Updated!</span>
+        </div>
+
+    </div>
+
+    <!-- JS APP CONTROLLER -->
+    <script>
+        function selectFeed(btn, feed) {
+            document.querySelectorAll('.feed-btn').forEach(b => {
+                b.className = "feed-btn text-gray-400 hover:text-white transition";
+            });
+            btn.className = "feed-btn text-white border-b-2 border-neon-pink pb-0.5 font-bold";
+            showToast(`Loaded ${feed === 'following' ? 'Following' : 'For You'} feed`);
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-page').forEach(p => p.classList.add('hidden'));
+            const targetPage = document.getElementById(`tab-${tab}`);
+            if (targetPage) targetPage.classList.remove('hidden');
+
+            document.querySelectorAll('.nav-item').forEach(btn => {
+                btn.classList.remove('text-neon-pink');
+                btn.classList.add('text-gray-400');
+            });
+
+            const targetNav = document.getElementById(`nav-${tab}`);
+            if (targetNav && tab !== 'upload') {
+                targetNav.classList.remove('text-gray-400');
+                targetNav.classList.add('text-neon-pink');
+            }
+        }
+
+        function handleLike(btn) {
+            const icon = btn.querySelector('.like-icon') || btn.querySelector('i');
+            if (icon.classList.contains('text-neon-pink')) {
+                icon.classList.remove('text-neon-pink');
+                icon.classList.add('text-white');
+            } else {
+                icon.classList.remove('text-white');
+                icon.classList.add('text-neon-pink');
+                showToast("Liked!");
+            }
+        }
+
+        function shareVideo(handle) {
+            showToast(`Copied ${handle} share link!`);
+        }
+
+        let autoTranslate = false;
+        function toggleTranslation() {
+            autoTranslate = document.getElementById('translate-switch').checked;
+            document.querySelectorAll('.chat-text-body').forEach(msg => {
+                if (autoTranslate) {
+                    msg.textContent = msg.getAttribute('data-trans') || msg.textContent;
+                } else {
+                    msg.textContent = msg.getAttribute('data-orig') || msg.textContent;
+                }
+            });
+            showToast(autoTranslate ? "Translation Active" : "Original Text");
+        }
+
+        const renderedMessageIds = new Set();
+
+        function appendChatMessage(sender, messageText, timestamp, isOwn, messageId) {
+            if (messageId && renderedMessageIds.has(messageId)) return;
+            if (messageId) renderedMessageIds.add(messageId);
+            const chatBox = document.getElementById('chat-messages');
+            if (!chatBox) return;
+
+            const wrapper = document.createElement('div');
+            wrapper.className = isOwn
+                ? 'flex items-start space-x-2 max-w-[85%] ml-auto flex-row-reverse space-x-reverse'
+                : 'flex items-start space-x-2 max-w-[85%]';
+
+            const avatar = document.createElement('div');
+            avatar.className = isOwn
+                ? 'w-7 h-7 rounded-full bg-neon-pink flex items-center justify-center text-[10px] font-bold text-white mt-1'
+                : 'w-7 h-7 rounded-full bg-dark-surface flex items-center justify-center text-[10px] font-bold text-cyan-300 mt-1';
+            avatar.textContent = isOwn ? 'Y' : String(sender || '?').replace('@', '').slice(0, 1).toUpperCase();
+
+            const bubble = document.createElement('div');
+            bubble.className = isOwn
+                ? 'bg-neon-pink text-white p-3 rounded-2xl rounded-tr-none'
+                : 'bg-dark-card p-3 rounded-2xl rounded-tl-none border border-dark-border';
+
+            const meta = document.createElement('div');
+            meta.className = 'flex justify-between items-center text-[9px] text-gray-300 mb-1 space-x-3';
+            const senderEl = document.createElement('span');
+            senderEl.className = 'font-bold';
+            senderEl.textContent = sender || '@guest';
+            const timeEl = document.createElement('span');
+            const date = timestamp ? new Date(timestamp) : new Date();
+            timeEl.textContent = Number.isNaN(date.getTime()) ? '' :
+                date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            meta.append(senderEl, timeEl);
+
+            const paragraph = document.createElement('p');
+            paragraph.className = 'text-xs chat-text-body break-words';
+            paragraph.textContent = messageText;
+            bubble.append(meta, paragraph);
+            wrapper.append(avatar, bubble);
+            chatBox.appendChild(wrapper);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        window.renderWAXTIXMessage = (message, messageId) => {
+            appendChatMessage(message.sender || '@guest', message.text, message.timestamp,
+                message.sender === '@you', messageId);
+        };
+
+        async function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (!message) return;
+            input.value = '';
+
+            if (typeof window.waxtixSendMessage === 'function') {
+                try {
+                    await window.waxtixSendMessage(message);
+                } catch (error) {
+                    console.error('WAXTIX message send failed:', error);
+                    appendChatMessage('@you', message, Date.now(), true);
+                    showToast('Could not sync message. Shown locally.');
+                }
+            } else {
+                appendChatMessage('@you', message, Date.now(), true);
+                showToast('Demo mode: message is local only.');
+            }
+        }
+
+        function onFileSelected(e) {
+            const file = e.target.files[0];
+            if (file) {
+                document.getElementById('file-label').textContent = file.name;
+                document.getElementById('upload-progress-card').classList.remove('hidden');
+            }
+        }
+
+        function startUploadProcess() {
+            const card = document.getElementById('upload-progress-card');
+            const bar = document.getElementById('progress-bar');
+            const label = document.getElementById('percent-label');
+
+            card.classList.remove('hidden');
+            let progress = 0;
+
+            const timer = setInterval(() => {
+                progress += 25;
+                bar.style.width = `${progress}%`;
+                label.textContent = `${progress}%`;
+
+                if (progress >= 100) {
+                    clearInterval(timer);
+                    setTimeout(() => {
+                        showToast("Demo complete. Connect Firebase Storage to publish media online.");
+                        switchTab('reels');
+                        card.classList.add('hidden');
+                        bar.style.width = '0%';
+                    }, 400);
+                }
+            }, 250);
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast-popup');
+            const text = document.getElementById('toast-text');
+            text.textContent = msg;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 2200);
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            const chatInput = document.getElementById('chat-input');
+            if (chatInput) chatInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') sendChatMessage();
+            });
+        });
+    </script>
+</body>
+</html>

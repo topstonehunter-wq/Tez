@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: waxtix
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: .
